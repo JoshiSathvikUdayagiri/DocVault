@@ -1,177 +1,188 @@
-
 import React, { useState, useEffect, useCallback } from 'react';
-import { DUMMY_FILES } from './constants';
-import { useFileSystem, FileSystemItem, Document as Doc, Folder as Fldr } from './hooks/useFileSystem';
-import { Page, Theme, UserProfile, ItemType } from './types';
+import { Page, Theme, UserProfile, Document, ItemType, FileSystemItem } from './types';
+import { useFileSystem } from './hooks/useFileSystem';
 import Sidebar from './components/Sidebar';
 import Dashboard from './components/Dashboard';
 import DocumentViewer from './components/DocumentViewer';
 import Settings from './components/Settings';
-import ApiKeyModal from './components/ApiKeyModal';
-// Fix: Use a named import for jwt-decode as the default export is deprecated.
-import { jwtDecode } from "jwt-decode";
 import Home from './components/Home';
 import Library from './components/Library';
 import BookReader from './components/BookReader';
 import { authorizeGoogleDrive, syncFilesToDrive, clearDriveToken } from './services/googleDriveService';
+import ApiKeyModal from './components/ApiKeyModal';
 import { initializeAiClient } from './services/geminiService';
 
-type DriveStatus = 'idle' | 'authorizing' | 'syncing' | 'synced' | 'error';
-
 const App: React.FC = () => {
-    const [theme, setTheme] = useState<Theme>(() => {
-        const storedTheme = localStorage.getItem('theme');
-        return (storedTheme as Theme) || Theme.DARK;
-    });
-    const [apiKey, setApiKey] = useState<string | null>(() => localStorage.getItem('gemini-api-key'));
-    const [isApiKeyMissing, setIsApiKeyMissing] = useState(false);
-    const [currentPage, setCurrentPage] = useState<Page>(Page.HOME);
-    const [selectedDocument, setSelectedDocument] = useState<Doc | null>(null);
-    const [user, setUser] = useState<UserProfile | null>(null);
-    const [driveStatus, setDriveStatus] = useState<DriveStatus>('idle');
-
-    const {
-        items,
-        currentPath,
-        currentFolderId,
-        navigate,
-        goBack,
-        addItem,
-        deleteItem,
-        updateItem
-    } = useFileSystem(DUMMY_FILES);
-
-    useEffect(() => {
-        if (apiKey) {
-            initializeAiClient(apiKey);
-            setIsApiKeyMissing(false);
-        } else {
-            setIsApiKeyMissing(true);
-        }
-    }, [apiKey]);
-
-    useEffect(() => {
-        if (theme === Theme.DARK) {
-            document.documentElement.classList.add('dark');
-        } else {
-            document.documentElement.classList.remove('dark');
-        }
-        localStorage.setItem('theme', theme);
-    }, [theme]);
+    const [apiKey, setApiKey] = useState<string | null>(null);
+    const [isApiKeyModalOpen, setIsApiKeyModalOpen] = useState(false);
     
+    const [theme, setTheme] = useState<Theme>(() => {
+        const savedTheme = localStorage.getItem('aether-theme');
+        return (savedTheme === Theme.DARK || savedTheme === Theme.LIGHT) ? savedTheme : Theme.DARK;
+    });
+
+    const [user, setUser] = useState<UserProfile | null>(null);
+    const [currentPage, setCurrentPage] = useState<Page>(Page.HOME);
+    const [selectedDocument, setSelectedDocument] = useState<Document | null>(null);
+    const [viewingMode, setViewingMode] = useState<'document' | 'book' | null>(null);
+    const [driveStatus, setDriveStatus] = useState<'idle' | 'authorizing' | 'syncing' | 'synced' | 'error'>('idle');
+
+    const { 
+        allItems, 
+        items, 
+        currentPath, 
+        addItem, 
+        deleteItem, 
+        updateItem, 
+        navigateToFolder, 
+        goBack 
+    } = useFileSystem();
+
+    useEffect(() => {
+        const savedKey = localStorage.getItem('gemini-api-key');
+        if (savedKey) {
+            const success = initializeAiClient(savedKey);
+            if (success) {
+                setApiKey(savedKey);
+            } else {
+                localStorage.removeItem('gemini-api-key');
+                setIsApiKeyModalOpen(true);
+            }
+        } else {
+            setIsApiKeyModalOpen(true);
+        }
+    }, []);
+
     const handleApiKeySubmit = (key: string) => {
-        if (key && key.trim()) {
-            const trimmedKey = key.trim();
-            localStorage.setItem('gemini-api-key', trimmedKey);
-            setApiKey(trimmedKey);
+        const success = initializeAiClient(key);
+        if (success) {
+            localStorage.setItem('gemini-api-key', key);
+            setApiKey(key);
+            setIsApiKeyModalOpen(false);
+        } else {
+            alert("Invalid API Key. Please check the key and try again.");
         }
     };
 
-    const handleLoginSuccess = (response: any) => {
-        const decoded: any = jwtDecode(response.credential);
-        setUser({
-            name: decoded.name,
-            email: decoded.email,
-            picture: decoded.picture,
-        });
-    };
+    useEffect(() => {
+        document.documentElement.className = theme;
+        localStorage.setItem('aether-theme', theme);
+    }, [theme]);
 
-    const handleLogout = () => {
+    useEffect(() => {
+        const script = document.createElement('script');
+        script.src = 'https://accounts.google.com/gsi/client';
+        script.async = true;
+        script.defer = true;
+        document.body.appendChild(script);
+        return () => {
+            document.body.removeChild(script);
+        };
+    }, []);
+
+    const handleLoginSuccess = useCallback((response: any) => {
+        try {
+            const credential = response.credential as string;
+            const payloadBase64Url = credential.split('.')[1];
+            const payloadBase64 = payloadBase64Url.replace(/-/g, '+').replace(/_/g, '/');
+            const decoded: { name: string, email: string, picture: string } = JSON.parse(atob(payloadBase64));
+
+            setUser({
+                name: decoded.name,
+                email: decoded.email,
+                picture: decoded.picture,
+            });
+            setCurrentPage(Page.HOME);
+        } catch (error) {
+            console.error("Error decoding JWT:", error);
+        }
+    }, []);
+
+    const handleLogout = useCallback(() => {
         setUser(null);
         clearDriveToken();
         setDriveStatus('idle');
-    };
-
-    const handleFileSelect = (file: Doc) => {
-        setSelectedDocument(file);
+        setCurrentPage(Page.HOME);
+    }, []);
+    
+    const handleFileSelect = (doc: Document) => {
+        if (doc.fileType === 'application/epub+zip') {
+            setViewingMode('book');
+        } else {
+            setViewingMode('document');
+        }
+        setSelectedDocument(doc);
     };
 
     const handleCloseViewer = () => {
         setSelectedDocument(null);
+        setViewingMode(null);
     };
 
-    const handleUpdateDocument = (updatedDoc: Doc) => {
+    const handleUpdateDocument = (updatedDoc: Document) => {
         updateItem(updatedDoc.id, updatedDoc);
-        if (selectedDocument && selectedDocument.id === updatedDoc.id) {
-            setSelectedDocument(updatedDoc);
-        }
+        setSelectedDocument(updatedDoc);
     };
-    
-    const handleSync = useCallback(async () => {
-        if (!user) {
-            console.error("Cannot sync without a user.");
-            return;
-        }
+
+    const handleSyncToDrive = async () => {
+        if (!user) return;
         setDriveStatus('authorizing');
         try {
             const token = await authorizeGoogleDrive();
             setDriveStatus('syncing');
-            const documentsToSync = items.filter(item => item.type === ItemType.DOCUMENT) as Doc[];
+            const documentsToSync = allItems.filter(item => item.type === ItemType.DOCUMENT) as Document[];
             await syncFilesToDrive(documentsToSync, token);
             setDriveStatus('synced');
         } catch (error) {
-            console.error("Google Drive sync failed:", error);
+            console.error('Google Drive sync failed:', error);
             setDriveStatus('error');
         }
-    }, [user, items]);
-
-
+    };
+    
     const renderPage = () => {
-        if (selectedDocument) {
-             if (selectedDocument.fileType === 'application/epub+zip') {
-                return <BookReader document={selectedDocument} onClose={handleCloseViewer} theme={theme} />;
-             }
-            return <DocumentViewer 
-                document={selectedDocument} 
-                onClose={handleCloseViewer}
-                onUpdateDocument={handleUpdateDocument}
-                onAddItem={addItem}
-            />;
-        }
-        
-        const currentFolderItems = items.filter(i => i.parentId === currentFolderId);
-
         switch (currentPage) {
             case Page.HOME:
-                return <Home allItems={items} onFileSelect={handleFileSelect} user={user} driveStatus={driveStatus} onSync={handleSync} />;
+                return <Home allItems={allItems} onFileSelect={handleFileSelect} user={user} driveStatus={driveStatus} onSync={handleSyncToDrive}/>;
             case Page.DASHBOARD:
-                return <Dashboard
-                    items={currentFolderItems}
-                    currentPath={currentPath as (Fldr | {id: 'root', name: 'My Drive'})[]}
+                return <Dashboard 
+                    items={items}
+                    currentPath={currentPath}
                     onFileSelect={handleFileSelect}
-                    onFolderSelect={navigate}
-                    onPathNavigate={navigate}
+                    onFolderSelect={navigateToFolder}
+                    onPathNavigate={navigateToFolder}
                     onGoBack={goBack}
                     onAddItem={addItem}
                     onDeleteItem={deleteItem}
                     onUpdateItem={updateItem}
                 />;
             case Page.LIBRARY:
-                return <Library allItems={items} onBookSelect={handleFileSelect} />;
+                return <Library allItems={allItems} onBookSelect={handleFileSelect} />;
             case Page.SETTINGS:
-                return <Settings theme={theme} setTheme={setTheme} user={user} onLoginSuccess={handleLoginSuccess} onLogout={handleLogout} />;
+                return <Settings theme={theme} setTheme={setTheme} user={user} onLogout={handleLogout} onLoginSuccess={handleLoginSuccess} />;
             default:
-                return <Home allItems={items} onFileSelect={handleFileSelect} user={user} driveStatus={driveStatus} onSync={handleSync} />;
+                return <Home allItems={allItems} onFileSelect={handleFileSelect} user={user} driveStatus={driveStatus} onSync={handleSyncToDrive} />;
         }
     };
 
+    if (!apiKey) {
+        return <ApiKeyModal isOpen={isApiKeyModalOpen} onKeySubmit={handleApiKeySubmit} />;
+    }
+
+    if (selectedDocument) {
+        if (viewingMode === 'document') {
+            return <DocumentViewer document={selectedDocument} onClose={handleCloseViewer} onUpdateDocument={handleUpdateDocument} onAddItem={addItem}/>;
+        }
+        if (viewingMode === 'book') {
+            return <BookReader document={selectedDocument} onClose={handleCloseViewer} theme={theme} />;
+        }
+    }
+
     return (
-        <div className={`${theme}`}>
-            <div className="flex h-screen font-sans bg-light-background dark:bg-dark-background text-light-onBackground dark:text-dark-onBackground">
-                <Sidebar
-                    currentPage={currentPage}
-                    setCurrentPage={setCurrentPage}
-                    user={user}
-                    onLogout={handleLogout}
-                />
-                <main className="flex-1 flex flex-col">
-                    {renderPage()}
-                </main>
-                <ApiKeyModal 
-                  isOpen={isApiKeyMissing} 
-                  onKeySubmit={handleApiKeySubmit}
-                />
-            </div>
+        <div className="flex h-screen bg-light-background dark:bg-dark-background text-light-onBackground dark:text-dark-onBackground font-sans">
+            <Sidebar currentPage={currentPage} setCurrentPage={setCurrentPage} user={user} onLogout={handleLogout} />
+            <main className="flex-1 flex flex-col overflow-hidden">
+                {renderPage()}
+            </main>
         </div>
     );
 };

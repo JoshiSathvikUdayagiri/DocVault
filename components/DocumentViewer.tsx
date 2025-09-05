@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Document as PdfDocument, Page as PdfPage, pdfjs } from 'react-pdf';
-import { Document, Annotation, ItemType, AnnotationType } from '../types';
+// Fix: Corrected the import path for FileSystemItem from '../types' instead of the hook file.
+import { Document, Annotation, ItemType, AnnotationType, FileSystemItem } from '../types';
 import { extractText, summarizeText, convertTextToJson, convertToJpg, getDefinition } from '../services/geminiService';
 import Icon from './ui/Icon';
-import { FileSystemItem } from '../hooks/useFileSystem';
 
 // Configure the PDF worker from a CDN
 pdfjs.GlobalWorkerOptions.workerSrc = 'https://aistudiocdn.com/pdfjs-dist@4.8.69/build/pdf.worker.min.mjs';

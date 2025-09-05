@@ -4,14 +4,24 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>AetherVault - Futuristic Document Hub</title>
+    
+    <!-- Google Scripts for Auth -->
     <script src="https://accounts.google.com/gsi/client" async defer></script>
     <script src="https://apis.google.com/js/api.js" async defer></script>
+    
+    <!-- TailwindCSS via CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Roboto+Flex:opsz,wght@8..144,300;8..144,400;8..144,500;8..144,700&display=swap" rel="stylesheet">
+    
+    <!-- react-pdf Styles -->
     <link rel="stylesheet" href="https://aistudiocdn.com/react-pdf@^9.1.0/dist/esm/Page/AnnotationLayer.css" />
     <link rel="stylesheet" href="https://aistudiocdn.com/react-pdf@^9.1.0/dist/esm/Page/TextLayer.css" />
+    
+    <!-- Tailwind Config -->
     <script>
       tailwind.config = {
         darkMode: 'class',
@@ -78,13 +88,12 @@
         }
       }
     </script>
-<script type="importmap">
+  <script type="importmap">
 {
   "imports": {
     "react": "https://aistudiocdn.com/react@^19.1.1",
     "react-dom/": "https://aistudiocdn.com/react-dom@^19.1.1/",
     "react/": "https://aistudiocdn.com/react@^19.1.1/",
-    "jwt-decode": "https://aistudiocdn.com/jwt-decode@^4.0.0",
     "lucide-react": "https://aistudiocdn.com/lucide-react@^0.542.0",
     "react-pdf": "https://aistudiocdn.com/react-pdf@^10.1.0",
     "@google/genai": "https://aistudiocdn.com/@google/genai@^1.17.0",
