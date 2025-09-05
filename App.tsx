@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { DUMMY_FILES } from './constants';
 import { useFileSystem, FileSystemItem, Document as Doc, Folder as Fldr } from './hooks/useFileSystem';
@@ -7,6 +8,7 @@ import Dashboard from './components/Dashboard';
 import DocumentViewer from './components/DocumentViewer';
 import Settings from './components/Settings';
 import ApiKeyModal from './components/ApiKeyModal';
+// Fix: Use a named import for jwt-decode as the default export is deprecated.
 import { jwtDecode } from "jwt-decode";
 import Home from './components/Home';
 import Library from './components/Library';
