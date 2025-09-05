@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AetherVault - Futuristic Document Hub</title>
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <script src="https://apis.google.com/js/api.js" async defer></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto+Flex:opsz,wght@8..144,300;8..144,400;8..144,500;8..144,700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://aistudiocdn.com/react-pdf@^9.1.0/dist/esm/Page/AnnotationLayer.css" />
+    <link rel="stylesheet" href="https://aistudiocdn.com/react-pdf@^9.1.0/dist/esm/Page/TextLayer.css" />
+    <script>
+      tailwind.config = {
+        darkMode: 'class',
+        theme: {
+          extend: {
+            fontFamily: {
+              sans: ['Roboto Flex', 'sans-serif'],
+            },
+            colors: {
+              // Material 3 Light Theme
+              light: {
+                primary: '#6750A4',
+                onPrimary: '#FFFFFF',
+                primaryContainer: '#EADDFF',
+                onPrimaryContainer: '#21005D',
+                secondary: '#625B71',
+                onSecondary: '#FFFFFF',
+                secondaryContainer: '#E8DEF8',
+                onSecondaryContainer: '#1D192B',
+                tertiary: '#7D5260',
+                onTertiary: '#FFFFFF',
+                tertiaryContainer: '#FFD8E4',
+                onTertiaryContainer: '#31111D',
+                error: '#B3261E',
+                onError: '#FFFFFF',
+                errorContainer: '#F9DEDC',
+                onErrorContainer: '#410E0B',
+                background: '#FFFBFE',
+                onBackground: '#1C1B1F',
+                surface: '#FFFBFE',
+                onSurface: '#1C1B1F',
+                surfaceVariant: '#E7E0EC',
+                onSurfaceVariant: '#49454F',
+                outline: '#79747E',
+              },
+              // Material 3 Dark Theme
+              dark: {
+                primary: '#D0BCFF',
+                onPrimary: '#381E72',
+                primaryContainer: '#4F378B',
+                onPrimaryContainer: '#EADDFF',
+                secondary: '#CCC2DC',
+                onSecondary: '#332D41',
+                secondaryContainer: '#4A4458',
+                onSecondaryContainer: '#E8DEF8',
+                tertiary: '#EFB8C8',
+                onTertiary: '#492532',
+                tertiaryContainer: '#633B48',
+                onTertiaryContainer: '#FFD8E4',
+                error: '#F2B8B5',
+                onError: '#601410',
+                errorContainer: '#8C1D18',
+                onErrorContainer: '#F9DEDC',
+                background: '#1C1B1F',
+                onBackground: '#E6E1E5',
+                surface: '#1C1B1F',
+                onSurface: '#E6E1E5',
+                surfaceVariant: '#49454F',
+                onSurfaceVariant: '#CAC4D0',
+                outline: '#938F99',
+              }
+            }
+          }
+        }
+      }
+    </script>
+  <script type="importmap">
+{
+  "imports": {
+    "react/": "https://aistudiocdn.com/react@^19.1.1/",
+    "react": "https://aistudiocdn.com/react@^19.1.1",
+    "react-dom/": "https://aistudiocdn.com/react-dom@^19.1.1/",
+    "lucide-react": "https://aistudiocdn.com/lucide-react@^0.542.0",
+    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.16.0",
+    "react-pdf": "https://aistudiocdn.com/react-pdf@^9.1.0",
+    "react-pdf/": "https://aistudiocdn.com/react-pdf@^9.1.0/",
+    "pdfjs-dist/": "https://aistudiocdn.com/pdfjs-dist@4.8.69/",
+    "react-reader": "https://aistudiocdn.com/react-reader@^2.0.5",
+    "epubjs": "https://aistudiocdn.com/epubjs@^0.3.93"
+  }
+}
+</script>
+</head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/index.tsx"></script>
+  </body>
+</html>
