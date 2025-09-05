@@ -1,202 +1,177 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { useFileSystem, Document } from './hooks/useFileSystem';
+import { DUMMY_FILES } from './constants';
+import { useFileSystem, FileSystemItem, Document as Doc, Folder as Fldr } from './hooks/useFileSystem';
+import { Page, Theme, UserProfile, ItemType } from './types';
 import Sidebar from './components/Sidebar';
 import Dashboard from './components/Dashboard';
+import DocumentViewer from './components/DocumentViewer';
 import Settings from './components/Settings';
+import ApiKeyModal from './components/ApiKeyModal';
+import { jwtDecode } from "jwt-decode";
 import Home from './components/Home';
 import Library from './components/Library';
-import DocumentViewer from './components/DocumentViewer';
 import BookReader from './components/BookReader';
-import { Page, Theme, UserProfile, ItemType } from './types';
-import { DUMMY_FILES } from './constants';
 import { authorizeGoogleDrive, syncFilesToDrive, clearDriveToken } from './services/googleDriveService';
+import { initializeAiClient } from './services/geminiService';
 
-// --- JWT Decoder ---
-function decodeJwt(token: string): UserProfile | null {
-  try {
-    const payload = JSON.parse(atob(token.split('.')[1]));
-
-    // Essential fields from Google's JWT
-    if (!payload.sub || !payload.email) {
-      console.error("Decoded JWT is missing essential 'sub' or 'email' fields", payload);
-      return null;
-    }
-    
-    // Construct a robust UserProfile object with fallbacks
-    const userProfile: UserProfile = {
-      sub: payload.sub,
-      email: payload.email,
-      name: payload.name || payload.given_name || payload.email.split('@')[0], // Use name, or given_name, or derive from email
-      picture: payload.picture, // Can be undefined
-      given_name: payload.given_name, // Can be undefined
-      family_name: payload.family_name, // Can be undefined
-    };
-
-    return userProfile;
-
-  } catch (e) {
-    console.error("Failed to decode JWT", e);
-    return null;
-  }
-}
+type DriveStatus = 'idle' | 'authorizing' | 'syncing' | 'synced' | 'error';
 
 const App: React.FC = () => {
-  const [theme, setTheme] = useState<Theme>(Theme.LIGHT);
-  const [currentPage, setCurrentPage] = useState<Page>(Page.HOME);
-  const [selectedFile, setSelectedFile] = useState<Document | null>(null);
-  const [selectedBook, setSelectedBook] = useState<Document | null>(null);
-  const [driveStatus, setDriveStatus] = useState<'idle' | 'authorizing' | 'syncing' | 'synced' | 'error'>('idle');
-  
-  const [user, setUser] = useState<UserProfile | null>(() => {
-    try {
-      const savedUser = localStorage.getItem('aether-user');
-      return savedUser ? JSON.parse(savedUser) : null;
-    } catch {
-      return null;
-    }
-  });
+    const [theme, setTheme] = useState<Theme>(() => {
+        const storedTheme = localStorage.getItem('theme');
+        return (storedTheme as Theme) || Theme.DARK;
+    });
+    const [apiKey, setApiKey] = useState<string | null>(() => localStorage.getItem('gemini-api-key'));
+    const [isApiKeyMissing, setIsApiKeyMissing] = useState(false);
+    const [currentPage, setCurrentPage] = useState<Page>(Page.HOME);
+    const [selectedDocument, setSelectedDocument] = useState<Doc | null>(null);
+    const [user, setUser] = useState<UserProfile | null>(null);
+    const [driveStatus, setDriveStatus] = useState<DriveStatus>('idle');
 
-  const {
-    items: allItems,
-    currentPath,
-    addItem,
-    deleteItem,
-    updateItem,
-    navigate,
-    goBack,
-  } = useFileSystem(DUMMY_FILES);
+    const {
+        items,
+        currentPath,
+        currentFolderId,
+        navigate,
+        goBack,
+        addItem,
+        deleteItem,
+        updateItem
+    } = useFileSystem(DUMMY_FILES);
 
-  useEffect(() => {
-    const livePreviewUrl = window.location.origin;
-    console.log("============================================================");
-    console.log("✅ AetherVault Developer Info");
-    console.log("IMPORTANT: Your current Live Preview URL is:");
-    console.log(`-> ${livePreviewUrl}`);
-    console.log("You MUST add this exact URL to the 'Authorized JavaScript origins' in your Google Cloud Console to enable Sign-In.");
-    console.log("============================================================");
-  }, []);
+    useEffect(() => {
+        if (apiKey) {
+            initializeAiClient(apiKey);
+            setIsApiKeyMissing(false);
+        } else {
+            setIsApiKeyMissing(true);
+        }
+    }, [apiKey]);
 
-  const syncWithDrive = useCallback(async () => {
-    setDriveStatus('authorizing');
-    try {
-      // Step 1: Get user consent and the auth token. This will trigger the popup.
-      const token = await authorizeGoogleDrive();
+    useEffect(() => {
+        if (theme === Theme.DARK) {
+            document.documentElement.classList.add('dark');
+        } else {
+            document.documentElement.classList.remove('dark');
+        }
+        localStorage.setItem('theme', theme);
+    }, [theme]);
+    
+    const handleApiKeySubmit = (key: string) => {
+        if (key && key.trim()) {
+            const trimmedKey = key.trim();
+            localStorage.setItem('gemini-api-key', trimmedKey);
+            setApiKey(trimmedKey);
+        }
+    };
 
-      // Step 2: Once authorized, update status and sync files.
-      setDriveStatus('syncing');
-      const documentsToUpload = allItems.filter(item => item.type === ItemType.DOCUMENT) as Document[];
-      await syncFilesToDrive(documentsToUpload, token);
-      
-      setDriveStatus('synced');
-    } catch (err) {
-      console.error("Google Drive sync failed:", err);
-      // Handle user closing the popup or denying access
-      if (err instanceof Error && (err.message.includes('popup_closed_by_user') || err.message.includes('access_denied'))) {
-        setDriveStatus('idle'); // Revert to idle if user cancels
-      } else {
-        setDriveStatus('error');
-      }
-    }
-  }, [allItems]);
+    const handleLoginSuccess = (response: any) => {
+        const decoded: any = jwtDecode(response.credential);
+        setUser({
+            name: decoded.name,
+            email: decoded.email,
+            picture: decoded.picture,
+        });
+    };
 
-  useEffect(() => {
-    const root = window.document.documentElement;
-    if (theme === Theme.DARK) {
-      root.classList.add('dark');
-    } else {
-      root.classList.remove('dark');
-    }
-  }, [theme]);
+    const handleLogout = () => {
+        setUser(null);
+        clearDriveToken();
+        setDriveStatus('idle');
+    };
 
-  useEffect(() => {
-    if (user) {
-      localStorage.setItem('aether-user', JSON.stringify(user));
-    } else {
-      localStorage.removeItem('aether-user');
-    }
-  }, [user]);
+    const handleFileSelect = (file: Doc) => {
+        setSelectedDocument(file);
+    };
 
-  const handleLoginSuccess = (response: any) => {
-    const userProfile = decodeJwt(response.credential);
-    if (userProfile) {
-      setUser(userProfile);
-      setCurrentPage(Page.HOME);
-      // Automatically trigger sync after login.
-      // This is non-blocking, so the UI remains responsive.
-      syncWithDrive();
-    }
-  };
+    const handleCloseViewer = () => {
+        setSelectedDocument(null);
+    };
 
-  const handleLogout = () => {
-    if (window.google) {
-      window.google.accounts.id.disableAutoSelect();
-    }
-    clearDriveToken(); // Revoke and clear the stored access token
-    setUser(null);
-    setDriveStatus('idle'); // Reset drive status on logout
-    setCurrentPage(Page.HOME);
-  };
+    const handleUpdateDocument = (updatedDoc: Doc) => {
+        updateItem(updatedDoc.id, updatedDoc);
+        if (selectedDocument && selectedDocument.id === updatedDoc.id) {
+            setSelectedDocument(updatedDoc);
+        }
+    };
+    
+    const handleSync = useCallback(async () => {
+        if (!user) {
+            console.error("Cannot sync without a user.");
+            return;
+        }
+        setDriveStatus('authorizing');
+        try {
+            const token = await authorizeGoogleDrive();
+            setDriveStatus('syncing');
+            const documentsToSync = items.filter(item => item.type === ItemType.DOCUMENT) as Doc[];
+            await syncFilesToDrive(documentsToSync, token);
+            setDriveStatus('synced');
+        } catch (error) {
+            console.error("Google Drive sync failed:", error);
+            setDriveStatus('error');
+        }
+    }, [user, items]);
 
-  const handleFileSelect = (file: Document) => {
-    if (file.fileType === 'application/epub+zip') {
-      setSelectedBook(file);
-    } else {
-      setSelectedFile(file);
-    }
-  };
 
-  const handleCloseViewer = useCallback(() => {
-    setSelectedFile(null);
-  }, []);
-  
-  const handleCloseBookReader = useCallback(() => {
-    setSelectedBook(null);
-  }, []);
+    const renderPage = () => {
+        if (selectedDocument) {
+             if (selectedDocument.fileType === 'application/epub+zip') {
+                return <BookReader document={selectedDocument} onClose={handleCloseViewer} theme={theme} />;
+             }
+            return <DocumentViewer 
+                document={selectedDocument} 
+                onClose={handleCloseViewer}
+                onUpdateDocument={handleUpdateDocument}
+                onAddItem={addItem}
+            />;
+        }
+        
+        const currentFolderItems = items.filter(i => i.parentId === currentFolderId);
 
-  const updateDocument = (updatedDoc: Document) => {
-    updateItem(updatedDoc.id, updatedDoc);
-    if(selectedFile && selectedFile.id === updatedDoc.id) {
-      setSelectedFile(updatedDoc);
-    }
-  };
+        switch (currentPage) {
+            case Page.HOME:
+                return <Home allItems={items} onFileSelect={handleFileSelect} user={user} driveStatus={driveStatus} onSync={handleSync} />;
+            case Page.DASHBOARD:
+                return <Dashboard
+                    items={currentFolderItems}
+                    currentPath={currentPath as (Fldr | {id: 'root', name: 'My Drive'})[]}
+                    onFileSelect={handleFileSelect}
+                    onFolderSelect={navigate}
+                    onPathNavigate={navigate}
+                    onGoBack={goBack}
+                    onAddItem={addItem}
+                    onDeleteItem={deleteItem}
+                    onUpdateItem={updateItem}
+                />;
+            case Page.LIBRARY:
+                return <Library allItems={items} onBookSelect={handleFileSelect} />;
+            case Page.SETTINGS:
+                return <Settings theme={theme} setTheme={setTheme} user={user} onLoginSuccess={handleLoginSuccess} onLogout={handleLogout} />;
+            default:
+                return <Home allItems={items} onFileSelect={handleFileSelect} user={user} driveStatus={driveStatus} onSync={handleSync} />;
+        }
+    };
 
-  const renderPage = () => {
-    switch (currentPage) {
-      case Page.HOME:
-        return <Home allItems={allItems} onFileSelect={handleFileSelect} driveStatus={driveStatus} user={user} onSync={syncWithDrive} />;
-      case Page.DASHBOARD:
-        return (
-          <Dashboard
-            items={allItems.filter(i => i.parentId === currentPath[currentPath.length - 1].id)}
-            currentPath={currentPath}
-            onFileSelect={handleFileSelect}
-            onFolderSelect={(folderId) => navigate(folderId)}
-            onPathNavigate={navigate}
-            onGoBack={goBack}
-            onAddItem={addItem}
-            onDeleteItem={deleteItem}
-            onUpdateItem={updateItem}
-          />
-        );
-      case Page.LIBRARY:
-        return <Library allItems={allItems} onBookSelect={handleFileSelect} />;
-      case Page.SETTINGS:
-        return <Settings theme={theme} setTheme={setTheme} user={user} onLogout={handleLogout} onLoginSuccess={handleLoginSuccess} />;
-      default:
-        return <Home allItems={allItems} onFileSelect={handleFileSelect} driveStatus={driveStatus} user={user} onSync={syncWithDrive} />;
-    }
-  };
-
-  return (
-    <div className="flex h-screen bg-light-background dark:bg-dark-background font-sans text-light-onSurface dark:text-dark-onSurface">
-      <Sidebar currentPage={currentPage} setCurrentPage={setCurrentPage} user={user} onLogout={handleLogout} />
-      <main className="flex-1 flex flex-col overflow-hidden relative">
-        {renderPage()}
-        {selectedFile && <div className="absolute inset-0 bg-light-background dark:bg-dark-background z-20"><DocumentViewer document={selectedFile} onClose={handleCloseViewer} onUpdateDocument={updateDocument} onAddItem={addItem} /></div>}
-        {selectedBook && <div className="absolute inset-0 bg-light-background dark:bg-dark-background z-20"><BookReader document={selectedBook} onClose={handleCloseBookReader} theme={theme} /></div>}
-      </main>
-    </div>
-  );
+    return (
+        <div className={`${theme}`}>
+            <div className="flex h-screen font-sans bg-light-background dark:bg-dark-background text-light-onBackground dark:text-dark-onBackground">
+                <Sidebar
+                    currentPage={currentPage}
+                    setCurrentPage={setCurrentPage}
+                    user={user}
+                    onLogout={handleLogout}
+                />
+                <main className="flex-1 flex flex-col">
+                    {renderPage()}
+                </main>
+                <ApiKeyModal 
+                  isOpen={isApiKeyMissing} 
+                  onKeySubmit={handleApiKeySubmit}
+                />
+            </div>
+        </div>
+    );
 };
 
 export default App;

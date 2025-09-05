@@ -1,5 +1,5 @@
 {
-  "name": "aethervault---futuristic-document-hub",
+  "name": "aethervault",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -9,18 +9,19 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@google/genai": "^1.16.0",
+    "epubjs": "^0.3.93",
+    "lucide-react": "^0.542.0",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
-    "lucide-react": "^0.542.0",
-    "@google/genai": "^1.16.0",
     "react-pdf": "^9.1.0",
-    "pdfjs-dist": "4.8.69",
-    "react-reader": "^2.0.5",
-    "epubjs": "^0.3.93"
+    "react-reader": "^2.0.5"
   },
   "devDependencies": {
-    "@types/node": "^22.14.0",
-    "typescript": "~5.8.2",
-    "vite": "^6.2.0"
+    "@types/react": "^18.2.0",
+    "@types/react-dom": "^18.2.0",
+    "@vitejs/plugin-react": "^4.2.0",
+    "typescript": "^5.2.2",
+    "vite": "^5.0.0"
   }
 }
